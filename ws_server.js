@@ -1,34 +1,34 @@
-
+// Import the WebSocket library
 const WebSocket = require("ws");
 
-
+// WebSocket Server Setup
 const wss = new WebSocket.Server({ port: 8080 });
 
 console.log("Server started on port 8080");
 
-
+// Map to track client subscriptions
 const clientSubscriptions = new Map();
 
 wss.on("connection", (ws) => {
   console.log("Client connected.");
 
-  
+  // Initialize an empty set of subscriptions for each client
   clientSubscriptions.set(ws, new Set());
 
-  
+  // Listen for messages from the client
   ws.on("message", (message) => {
-    
+    // Parse the message (assuming it's JSON)
     try {
       const data = JSON.parse(message);
 
       console.log("received from client: ", data.action);
 
       if (data.type === "subscribe" && data.action) {
-        
+        // Add the action to the client's subscription set
         clientSubscriptions.get(ws).add(data.action);
         console.log(`Client subscribed to: ${data.action}`);
       } else if (data.type === "unsubscribe" && data.action) {
-        
+        // Remove the action from the client's subscription set
         clientSubscriptions.get(ws).delete(data.action);
         console.log(`Client unsubscribed from: ${data.action}`);
       } else {
@@ -49,7 +49,7 @@ wss.on("connection", (ws) => {
   });
 });
 
-
+// Broadcast messages to clients with the given subscription
 function broadcastMessage(action, message) {
   console.log("broadcasting msg: ", action);
   for (const [client, subscriptions] of clientSubscriptions.entries()) {
@@ -60,7 +60,7 @@ function broadcastMessage(action, message) {
 }
 
 async function listen() {
-  const uri = "ws:
+  const uri = "ws://188.245.35.202:8765";
   const websocket = new WebSocket(uri);
 
   websocket.on("open", () => {
