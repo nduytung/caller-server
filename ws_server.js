@@ -87,4 +87,6 @@ async function listen() {
   setInterval(() => {}, 10_000);
 }
 
+setInterval(() => {}, 10_000);
+
 listen();
