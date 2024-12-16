@@ -49,44 +49,86 @@ function broadcastMessage(action, message) {
   }
 }
 
-async function listen() {
-  const uri = "ws://188.245.35.202:8765";
-  const websocket = new WebSocket(uri);
+class ForwardMessageWebSocket {
+    constructor(url) {
+        this.url = url;
+        this.reconnectAttempts = 0;
+        this.maxReconnectAttempts = 10;
+        this.reconnectInterval = 1000; // Start with 1 second
+        this.maxReconnectInterval = 30000; // Cap at 30 seconds
+        this.websocket = null;
 
-  websocket.on("open", () => {
-    console.log("Connected to websocket server");
-    const authMsg = JSON.stringify({
-      user: "user1",
-      password: "Password1q2w#E$R",
-    });
-    websocket.send(authMsg);
-  });
-
-  websocket.on("message", (message) => {
-    try {
-      const data = JSON.parse(message);
-
-      console.log("received from wss remote: ", data);
-      broadcastMessage("new_token_call_sig", {
-        type: "new_token_call_sig",
-        analyze: data?.message,
-      });
-    } catch (error) {
-      console.error(`Error parsing message: ${error}`);
+        this.connect();
     }
-  });
 
-  websocket.on("error", (error) => {
-    console.error(`WebSocket error: ${error}`);
-  });
+    connect() {
+        this.websocket = new WebSocket(this.url);
 
-  websocket.on("close", () => {
-    console.log("WebSocket connection closed");
-  });
+        this.websocket.onopen = () => {
+            console.log("Connected to websocket server");
+            this.reconnectAttempts = 0; // Reset attempts on successful connection
+            const authMsg = JSON.stringify({
+                user: "user1",
+                password: "Password1q2w#E$R",
+            });
+            this.websocket.send(authMsg);
+        };
 
-  setInterval(() => {}, 10_000);
+        this.websocket.on("message", (message) => {
+            try {
+                const data = JSON.parse(message);
+
+                console.log("received from wss remote: ", data);
+                broadcastMessage("new_token_call_sig", {
+                    type: "new_token_call_sig",
+                    analyze: data?.message,
+                });
+            } catch (error) {
+                console.error(`Error parsing message: ${error}`);
+            }
+        });
+
+        this.websocket.onclose = (event) => {
+            console.warn("WebSocket closed:", event);
+            this.reconnect();
+        };
+
+        this.websocket.onerror = (event) => {
+            console.error("WebSocket error:", event);
+            this.websocket.close(); // Trigger onclose for cleanup and reconnection
+        };
+    }
+
+    reconnect() {
+        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+            console.error(
+                "Max reconnect attempts reached. Stopping reconnect attempts."
+            );
+            return;
+        }
+
+        const reconnectDelay = Math.min(
+            this.reconnectInterval * Math.pow(2, this.reconnectAttempts),
+            this.maxReconnectInterval
+        );
+
+        console.log(
+            `Attempting to reconnect in ${reconnectDelay / 1000} seconds...`
+        );
+        this.reconnectAttempts++;
+
+        setTimeout(() => {
+            this.connect();
+        }, reconnectDelay);
+    }
+
+    close() {
+        if (this.websocket) {
+            this.websocket.onclose = null; // Prevent triggering the reconnection logic
+            this.websocket.close();
+        }
+    }
 }
 
-setInterval(() => {}, 10_000);
-
-listen();
+// Usage
+const ws = new ForwardMessageWebSocket("ws://188.245.35.202:8765");
